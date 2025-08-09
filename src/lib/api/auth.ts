@@ -25,8 +25,15 @@ export interface AuthResponse {
 
 export const auth = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await axios.post(`${API_URL}/auth/login`, credentials);
-    return response.data;
+    try {
+      const response = await axios.post(`${API_URL}/auth/login`, credentials);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        throw new Error('Invalid email or password');
+      }
+      throw new Error(error.response?.data?.message || 'An error occurred during login');
+    }
   },
 
   async register(data: RegisterData): Promise<AuthResponse> {
@@ -35,9 +42,25 @@ export const auth = {
   },
 
   async getProfile(token: string) {
-    const response = await axios.get(`${API_URL}/auth/profile`, {
+    const response = await axios.get(`${API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` }
     });
+    return response.data;
+  },
+
+  async updateProfile(token: string, name: string) {
+    const response = await axios.patch(`${API_URL}/auth/profile`, 
+      { name },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  },
+
+  async updatePassword(token: string, data: { currentPassword: string; newPassword: string }) {
+    const response = await axios.patch(`${API_URL}/auth/password`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
     return response.data;
   }
 };

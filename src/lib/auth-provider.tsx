@@ -17,7 +17,7 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
   setAuth: () => {},
@@ -30,32 +30,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Load auth state from localStorage on mount
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    try {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
 
-    if (storedToken && storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setToken(storedToken);
-      setUser(parsedUser);
-      webSocketService.connect(storedToken);
+      if (storedToken && storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          if (parsedUser && typeof parsedUser === 'object') {
+            setToken(storedToken);
+            setUser(parsedUser);
+          }
+        } catch (e) {
+          // Invalid JSON in localStorage, clear it
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+        }
+      }
+    } catch (e) {
+      // Handle case where localStorage is not available
+      console.error('Failed to access localStorage:', e);
     }
   }, []);
 
   const setAuth = (newToken: string, newUser: User) => {
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
-    setToken(newToken);
-    setUser(newUser);
-    webSocketService.connect(newToken);
+    try {
+      // Store in localStorage
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(newUser));
+      
+      // Store in cookies
+      document.cookie = `token=${newToken}; path=/`;
+      document.cookie = `user=${encodeURIComponent(JSON.stringify(newUser))}; path=/`;
+      
+      // Update state
+      setToken(newToken);
+      setUser(newUser);
+      
+      // Connect WebSocket
+      webSocketService.connect(newToken);
+    } catch (error) {
+      console.error('Error setting auth:', error);
+    }
   };
 
   const logout = () => {
+    // Clear localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Clear cookies
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    document.cookie = 'user=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    
+    // Clear state
     setToken(null);
     setUser(null);
+    
+    // Disconnect WebSocket
     webSocketService.disconnect();
-    window.location.href = '/login';
+    
+    // Redirect to login
+    window.location.href = '/';
   };
 
   return (

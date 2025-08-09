@@ -6,33 +6,51 @@ export class WebSocketService {
   private socket: Socket | null = null;
   private token: string | null = null;
 
-  connect(token: string) {
-    if (this.socket) {
-      return;
+  private getSocket(): Socket {
+    if (!this.socket) {
+      throw new Error('Socket not initialized');
     }
+    return this.socket;
+  }
+
+  connect(token: string) {
+    // Disconnect existing socket if any
+    this.disconnect();
 
     this.token = token;
     this.socket = io(SOCKET_URL, {
       auth: {
         token,
       },
+      transports: ['websocket'],
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000,
     });
 
-    this.socket.on('connect', () => {
-      console.log('Connected to WebSocket server');
-    });
+    // Set up event listeners
+    if (this.socket) {
+      this.socket.on('connect', () => {
+        console.log('Connected to WebSocket server');
+      });
 
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from WebSocket server');
-    });
+      this.socket.on('disconnect', () => {
+        console.log('Disconnected from WebSocket server');
+      });
+
+      this.socket.on('connect_error', (error) => {
+        console.error('WebSocket connection error:', error);
+        this.disconnect();
+      });
+    }
   }
 
   disconnect() {
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
-      this.token = null;
     }
+    this.token = null;
   }
 
   onFileStatusUpdate(callback: (data: { fileId: string; status: string; error?: string }) => void) {

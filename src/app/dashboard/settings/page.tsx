@@ -1,8 +1,10 @@
 'use client';
 
+import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { auth } from '@/lib/api/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,14 +24,43 @@ const passwordFormSchema = z.object({
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const [loading, setLoading] = React.useState(true);
 
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      name: 'User',
-      email: 'user@example.com',
+      name: '',
+      email: '',
     },
   });
+
+  // Fetch user data on mount
+  React.useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No token found');
+        }
+
+        const userData = await auth.getProfile(token);
+        profileForm.reset({
+          name: userData.name || '',
+          email: userData.email
+        });
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load user data',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [toast, profileForm]);
 
   const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
     resolver: zodResolver(passwordFormSchema),
@@ -39,19 +70,59 @@ export default function SettingsPage() {
     },
   });
 
-  function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
-    toast({
-      title: 'Profile updated!',
-      description: 'Your profile information has been saved.',
-    });
+  async function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No token found');
+      }
+
+      await auth.updateProfile(token, values.name);
+      toast({
+        title: 'Success',
+        description: 'Your profile has been updated.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update profile',
+        variant: 'destructive',
+      });
+    }
   }
 
-  function onPasswordSubmit(values: z.infer<typeof passwordFormSchema>) {
-    toast({
-      title: 'Password updated!',
-      description: 'Your new password has been set.',
-    });
-    passwordForm.reset();
+  async function onPasswordSubmit(values: z.infer<typeof passwordFormSchema>) {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No token found');
+      }
+
+      await auth.updatePassword(token, {
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword
+      });
+      
+      toast({
+        title: 'Success',
+        description: 'Your password has been updated.',
+      });
+      passwordForm.reset();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update password',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        Loading...
+      </div>
+    );
   }
 
   return (

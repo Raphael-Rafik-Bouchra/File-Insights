@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { auth } from '@/lib/api/auth';
-import { webSocketService } from '@/lib/websocket';
+import { AuthContext } from '@/lib/auth-provider';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,25 +37,49 @@ export function LoginForm() {
     },
   });
 
+  const { setAuth } = React.useContext(AuthContext);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       setIsLoading(true);
       const response = await auth.login(values);
-      localStorage.setItem('token', response.access_token);
-      localStorage.setItem('user', JSON.stringify(response.user));
       
-      // Connect WebSocket
-      webSocketService.connect(response.access_token);
+      // Update auth context first
+      setAuth(response.access_token, response.user);
       
-      if (response.user.role === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/dashboard');
-      }
+      // Then redirect using router.push with await to ensure it completes
+      const redirectPath = response.user.role === 'admin' ? '/admin' : '/dashboard';
+      await router.push(redirectPath);
+      
+      // Force a page refresh to ensure the new auth state is loaded
+      router.refresh();
     } catch (error: any) {
+      console.error('Login error:', error);
+      
+      // Clear any existing errors
+      form.clearErrors();
+      
+      // Set the error message
+      const errorMessage = error.message || 'Login failed. Please try again.';
+      
+      // Set form errors
       form.setError('root', {
-        message: error.response?.data?.message || 'Login failed. Please try again.',
+        type: 'manual',
+        message: errorMessage
       });
+      
+      // If it's an invalid credentials error, highlight both fields
+      if (errorMessage.toLowerCase().includes('invalid') || 
+          error.message?.toLowerCase().includes('invalid')) {
+        form.setError('email', { 
+          type: 'manual',
+          message: 'Please check your credentials' 
+        });
+        form.setError('password', { 
+          type: 'manual',
+          message: 'Please check your credentials' 
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -101,6 +125,12 @@ export function LoginForm() {
             </FormItem>
           )}
         />
+
+        {form.formState.errors.root && (
+          <div className="p-3 mb-4 text-sm text-red-500 bg-red-50 rounded-md dark:text-red-400 dark:bg-red-900/10">
+            {form.formState.errors.root.message}
+          </div>
+        )}
 
         <div>
           <Button type="submit" className="w-full" disabled={isLoading}>
