@@ -23,7 +23,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -33,8 +32,17 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+    DialogClose
+  } from "@/components/ui/dialog"
+import { EditUserForm } from './edit-user-form';
 
 interface UsersTableProps {
   users: User[];
@@ -57,9 +65,23 @@ const formatRelativeDate = (date: Date) => {
 }
 
 export function UsersTable({ users, onUpdateUser, onDeleteUser }: UsersTableProps) {
-  const { toast } = useToast();
+    const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+    const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
+    const [userToDelete, setUserToDelete] = React.useState<string | null>(null);
+
+    const handleEditClick = (user: User) => {
+        setSelectedUser(user);
+        setIsEditDialogOpen(true);
+    };
+
+    const handleFormSubmit = (updatedUser: User) => {
+        onUpdateUser(updatedUser);
+        setIsEditDialogOpen(false);
+        setSelectedUser(null);
+    }
 
   return (
+    <>
     <div className="rounded-lg border">
         <Table>
             <TableHeader>
@@ -85,49 +107,68 @@ export function UsersTable({ users, onUpdateUser, onDeleteUser }: UsersTableProp
                     </TableCell>
                     <TableCell>{formatRelativeDate(user.lastLogin)}</TableCell>
                     <TableCell className="text-right">
-                        <AlertDialog>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                    <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onSelect={() => toast({ title: "Edit clicked for " + user.name })}>
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        <span>Edit</span>
-                                    </DropdownMenuItem>
-                                    <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem
-                                            className="text-destructive"
-                                            onSelect={(e) => e.preventDefault()}
-                                        >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            <span>Delete</span>
-                                        </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the user account.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => onDeleteUser(user.id)} className="bg-destructive hover:bg-destructive/90">
-                                    Delete
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => handleEditClick(user)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    <span>Edit</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    className="text-destructive"
+                                    onSelect={() => setUserToDelete(user.id)}
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Delete</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </TableCell>
                 </TableRow>
             ))}
             </TableBody>
         </Table>
     </div>
+    <AlertDialog open={!!userToDelete} onOpenChange={(isOpen) => !isOpen && setUserToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the user account.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+                if(userToDelete) {
+                    onDeleteUser(userToDelete)
+                }
+            }} className="bg-destructive hover:bg-destructive/90">
+                Delete
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit User</DialogTitle>
+                <DialogDescription>
+                    Modify the user details below.
+                </DialogDescription>
+            </DialogHeader>
+            {selectedUser && (
+                <EditUserForm
+                    user={selectedUser}
+                    onSubmit={handleFormSubmit}
+                />
+            )}
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }
