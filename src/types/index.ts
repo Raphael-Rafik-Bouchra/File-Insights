@@ -4,4 +4,5 @@ export interface FileItem {
   status: 'pending' | 'uploading' | 'processing' | 'summarizing' | 'complete' | 'error';
   summary?: string;
   error?: string;
+  uploadDate?: Date;
 }

@@ -7,6 +7,7 @@ import { type FileItem } from '@/types';
 import { summarizeFile } from '@/ai/flows/summarize-file';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
+import { FileTypeBreakdownChart } from '@/components/dashboard/file-type-breakdown-chart';
 
 export default function DashboardPage() {
   const [files, setFiles] = React.useState<FileItem[]>([]);
@@ -23,6 +24,7 @@ export default function DashboardPage() {
       id: uuidv4(),
       file,
       status: 'pending',
+      uploadDate: new Date(),
     }));
     setFiles((prevFiles) => [...newFileItems, ...prevFiles]);
   };
@@ -85,8 +87,15 @@ export default function DashboardPage() {
           Upload your files and get AI-powered insights.
         </p>
       </div>
-      <FileUploader onFilesAdded={handleAddFiles} />
-      <FilesTable files={files} onRetry={handleRetry} onDelete={handleDelete} />
+      <div className="grid gap-8 md:grid-cols-3">
+        <div className="md:col-span-2 space-y-8">
+            <FileUploader onFilesAdded={handleAddFiles} />
+            <FilesTable files={files} onRetry={handleRetry} onDelete={handleDelete} />
+        </div>
+        <div className="space-y-8">
+            <FileTypeBreakdownChart files={files} />
+        </div>
+      </div>
     </div>
   );
 }
