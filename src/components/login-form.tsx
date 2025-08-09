@@ -40,7 +40,11 @@ export function LoginForm() {
     // Simulate API call
     setTimeout(() => {
       setIsLoading(false);
-      router.push('/dashboard');
+      if (values.email === 'admin@admin.com' && values.password === 'AdminPass') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
     }, 1000);
   }
 
