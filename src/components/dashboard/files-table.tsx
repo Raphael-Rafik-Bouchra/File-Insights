@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import {
   Table,
   TableBody,
@@ -200,6 +201,7 @@ export function FilesTable({ files, onRetry, onDelete }: FilesTableProps) {
         <Table>
             <TableHeader>
             <TableRow>
+                <TableHead className="w-[80px]">Preview</TableHead>
                 <TableHead>File</TableHead>
                 <TableHead>Size</TableHead>
                 <TableHead>Date</TableHead>
@@ -210,6 +212,15 @@ export function FilesTable({ files, onRetry, onDelete }: FilesTableProps) {
             <TableBody>
             {filteredAndSortedFiles.map((item) => (
                 <TableRow key={item.id}>
+                <TableCell>
+                    {item.previewUrl ? (
+                        <Image src={item.previewUrl} alt={`preview of ${item.file.name}`} width={40} height={40} className="w-10 h-10 object-cover rounded-md" />
+                    ) : (
+                        <div className="w-10 h-10 flex items-center justify-center bg-muted rounded-md">
+                            <FileIcon className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                    )}
+                </TableCell>
                 <TableCell className="font-medium">{item.file.name}</TableCell>
                 <TableCell>{formatBytes(item.file.size)}</TableCell>
                 <TableCell>{item.uploadDate?.toLocaleDateString()}</TableCell>

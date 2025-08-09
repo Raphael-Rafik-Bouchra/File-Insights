@@ -5,4 +5,5 @@ export interface FileItem {
   summary?: string;
   error?: string;
   uploadDate?: Date;
+  previewUrl?: string;
 }

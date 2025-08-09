@@ -20,12 +20,16 @@ export default function DashboardPage() {
   };
 
   const handleAddFiles = (newFiles: File[]) => {
-    const newFileItems: FileItem[] = newFiles.map((file) => ({
-      id: uuidv4(),
-      file,
-      status: 'pending',
-      uploadDate: new Date(),
-    }));
+    const newFileItems: FileItem[] = newFiles.map((file) => {
+      const isImage = file.type.startsWith('image/');
+      return {
+        id: uuidv4(),
+        file,
+        status: 'pending',
+        uploadDate: new Date(),
+        previewUrl: isImage ? URL.createObjectURL(file) : undefined,
+      };
+    });
     setFiles((prevFiles) => [...newFileItems, ...prevFiles]);
   };
 
@@ -75,8 +79,24 @@ export default function DashboardPage() {
   };
 
   const handleDelete = (id: string) => {
-    setFiles(prev => prev.filter(f => f.id !== id));
+    setFiles(prev => {
+        const fileToDelete = prev.find(f => f.id === id);
+        if (fileToDelete?.previewUrl) {
+            URL.revokeObjectURL(fileToDelete.previewUrl);
+        }
+        return prev.filter(f => f.id !== id);
+    });
   };
+
+  React.useEffect(() => {
+    return () => {
+        files.forEach(file => {
+            if (file.previewUrl) {
+                URL.revokeObjectURL(file.previewUrl);
+            }
+        });
+    }
+  }, []);
 
 
   return (
