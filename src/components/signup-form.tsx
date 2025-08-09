@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { auth } from '@/lib/api/auth';
+import { webSocketService } from '@/lib/websocket';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -45,13 +47,26 @@ export function SignUpForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      setIsLoading(true);
+      const { confirmPassword, ...registerData } = values;
+      const response = await auth.register(registerData);
+      
+      localStorage.setItem('token', response.access_token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      
+      // Connect WebSocket
+      webSocketService.connect(response.access_token);
+      
       router.push('/dashboard');
-    }, 1000);
+    } catch (error: any) {
+      form.setError('root', {
+        message: error.response?.data?.message || 'Registration failed. Please try again.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (

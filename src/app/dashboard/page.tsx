@@ -1,119 +1,150 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
+import { FileList } from '@/components/dashboard/file-list';
+import { FileTypeBreakdownChart } from '@/components/dashboard/file-type-breakdown-chart';
 import { FileUploader } from '@/components/dashboard/file-uploader';
 import { FilesTable } from '@/components/dashboard/files-table';
-import { type FileItem } from '@/types';
-import { summarizeFile } from '@/ai/flows/summarize-file';
-import { v4 as uuidv4 } from 'uuid';
+import { FileItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { FileTypeBreakdownChart } from '@/components/dashboard/file-type-breakdown-chart';
 
 export default function DashboardPage() {
-  const [files, setFiles] = React.useState<FileItem[]>([]);
+  const router = useRouter();
   const { toast } = useToast();
+  const [files, setFiles] = React.useState<FileItem[]>([]);
+  const [loading, setLoading] = React.useState<boolean>(true);
 
-  const updateFileStatus = (id: string, status: FileItem['status'], data?: Partial<Omit<FileItem, 'id' | 'file'>>) => {
-    setFiles((prevFiles) =>
-      prevFiles.map((f) => (f.id === id ? { ...f, status, ...data } : f))
-    );
-  };
+  // Check for authentication
+  React.useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
 
-  const handleAddFiles = (newFiles: File[]) => {
-    const newFileItems: FileItem[] = newFiles.map((file) => {
-      const isImage = file.type.startsWith('image/');
-      return {
-        id: uuidv4(),
-        file,
-        status: 'pending',
-        uploadDate: new Date(),
-        previewUrl: isImage ? URL.createObjectURL(file) : undefined,
-      };
-    });
-    setFiles((prevFiles) => [...newFileItems, ...prevFiles]);
-  };
+    // Fetch initial files
+    fetchFiles();
+  }, [router]);
 
-  const processFile = async (item: FileItem) => {
+  const fetchFiles = async () => {
     try {
-      // 1. Uploading
-      updateFileStatus(item.id, 'uploading');
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate upload
-
-      // 2. Processing
-      updateFileStatus(item.id, 'processing');
-      const text = await item.file.text();
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate processing
-
-      // 3. Summarizing
-      updateFileStatus(item.id, 'summarizing');
-      const result = await summarizeFile({ text });
-
-      if (result.summary) {
-        updateFileStatus(item.id, 'complete', { summary: result.summary });
-      } else {
-        throw new Error('Summarization failed.');
-      }
-    } catch (e: any) {
-      const error = e.message || 'An unknown error occurred.';
-      updateFileStatus(item.id, 'error', { error });
+      const response = await fetch('/api/files', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch files');
+      
+      const data = await response.json();
+      setFiles(data);
+    } catch (error) {
       toast({
-        variant: 'destructive',
-        title: `Error processing ${item.file.name}`,
-        description: error,
+        title: "Error",
+        description: "Failed to load files",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+const handleAddFiles = async (newFiles: File[]): Promise<void> => {
+  try {
+    // Convert File[] to FileItem[]
+    const fileItems: FileItem[] = newFiles.map(file => ({
+      id: crypto.randomUUID(), // Generate a temporary ID
+      file: file,
+      status: 'pending',
+      uploadDate: new Date()
+    }));
+
+    setFiles(prevFiles => [...prevFiles, ...fileItems]);
+    // Additional API call to upload files would go here
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "Failed to upload files",
+      variant: "destructive"
+    });
+  }
+};
+
+  const handleRetry = async (fileId: string): Promise<void> => {
+    try {
+      const response = await fetch(`/api/files/${fileId}/retry`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Retry failed');
+
+      toast({
+        title: "Success",
+        description: "File processing restarted",
+      });
+
+      await fetchFiles();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to retry file processing",
+        variant: "destructive"
       });
     }
   };
 
-  React.useEffect(() => {
-    const pendingFiles = files.filter((f) => f.status === 'pending');
-    if (pendingFiles.length > 0) {
-      pendingFiles.forEach(processFile);
-    }
-  }, [files]);
-  
-  const handleRetry = (id: string) => {
-    const fileToRetry = files.find(f => f.id === id);
-    if (fileToRetry) {
-        setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'pending', error: undefined } : f));
-    }
-  };
-
-  const handleDelete = (id: string) => {
-    setFiles(prev => {
-        const fileToDelete = prev.find(f => f.id === id);
-        if (fileToDelete?.previewUrl) {
-            URL.revokeObjectURL(fileToDelete.previewUrl);
+  const handleDelete = async (fileId: string): Promise<void> => {
+    try {
+      const response = await fetch(`/api/files/${fileId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
-        return prev.filter(f => f.id !== id);
-    });
+      });
+
+      if (!response.ok) throw new Error('Delete failed');
+
+      setFiles(files.filter(file => file.id !== fileId));
+      toast({
+        title: "Success",
+        description: "File deleted successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete file",
+        variant: "destructive"
+      });
+    }
   };
 
-  React.useEffect(() => {
-    return () => {
-        files.forEach(file => {
-            if (file.previewUrl) {
-                URL.revokeObjectURL(file.previewUrl);
-            }
-        });
-    }
-  }, []);
-
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
 
   return (
-    <div className="space-y-8">
+    <div className="container mx-auto p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-semibold mb-4">Dashboard</h1>
+        <p className="text-muted-foreground mb-8">
           Upload your files and get AI-powered insights.
         </p>
       </div>
-      <div className="grid gap-8 md:grid-cols-3">
-        <div className="md:col-span-2 space-y-8">
-            <FileUploader onFilesAdded={handleAddFiles} />
-            <FilesTable files={files} onRetry={handleRetry} onDelete={handleDelete} />
+      <div className="grid gap-8 md:grid-cols-[300px,1fr]">
+        <div className="space-y-6">
+          <FileTypeBreakdownChart files={files} />
         </div>
-        <div className="space-y-8">
-            <FileTypeBreakdownChart files={files} />
+        <div className="space-y-6">
+          <FileUploader onFilesAdded={handleAddFiles} />
+          <FilesTable 
+            files={files} 
+            onRetry={handleRetry} 
+            onDelete={handleDelete} 
+          />
         </div>
       </div>
     </div>

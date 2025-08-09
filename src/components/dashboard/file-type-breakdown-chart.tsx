@@ -31,27 +31,41 @@ const chartConfig = {
   other: { label: "Other", color: "hsl(var(--chart-5))" },
 } satisfies ChartConfig
 
+import { stats } from '@/lib/api/stats';
+
 interface FileTypeBreakdownChartProps {
-    files: FileItem[];
+  files: FileItem[];
 }
 
 export function FileTypeBreakdownChart({ files }: FileTypeBreakdownChartProps) {
-  const chartData = React.useMemo(() => {
-    const typeCounts = files.reduce((acc, item) => {
-        const fileType = item.file.type.split('/')[0];
-        const key = ['text', 'image', 'video', 'audio'].includes(fileType) ? fileType : 'other';
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
+  const [chartData, setChartData] = React.useState<{ type: string; count: number; fill: string }[]>([]);
+  const [totalFiles, setTotalFiles] = React.useState(0);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-    return Object.entries(typeCounts).map(([type, count]) => ({
-        type,
-        count,
-        fill: `var(--color-${type})`
-    }));
-  }, [files]);
-  
-  const totalFiles = React.useMemo(() => files.length, [files]);
+  React.useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const data = await stats.getFileTypeBreakdown(token);
+        const total = data.reduce((sum, item) => sum + item.count, 0);
+        
+        setChartData(data.map(item => ({
+          type: item.type,
+          count: item.count,
+          fill: `var(--color-${item.type.toLowerCase()})`
+        })));
+        setTotalFiles(total);
+      } catch (error) {
+        console.error('Failed to fetch file type stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   return (
     <Card className="flex flex-col">
