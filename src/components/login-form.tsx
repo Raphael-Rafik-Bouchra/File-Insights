@@ -47,12 +47,12 @@ export function LoginForm() {
       // Update auth context first
       setAuth(response.access_token, response.user);
       
-      // Then redirect using router.push with await to ensure it completes
-      const redirectPath = response.user.role === 'admin' ? '/admin' : '/dashboard';
-      await router.push(redirectPath);
+      // Small delay to ensure cookies are set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Force a page refresh to ensure the new auth state is loaded
-      router.refresh();
+      // Then redirect using window.location for a full page load
+      const redirectPath = response.user.role === 'admin' ? '/admin' : '/dashboard';
+      window.location.href = redirectPath;
     } catch (error: any) {
       console.error('Login error:', error);
       

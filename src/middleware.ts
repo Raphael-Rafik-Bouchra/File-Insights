@@ -10,9 +10,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // For protected routes, check auth header
+  // For protected routes, check auth token from cookies or header
   const authHeader = request.headers.get('authorization');
-  const token = authHeader?.split(' ')[1];
+  const headerToken = authHeader?.split(' ')[1];
+  const cookieToken = request.cookies.get('token')?.value;
+  const token = headerToken || cookieToken;
 
   // If no token and trying to access protected route, redirect to login
   if (!token && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
